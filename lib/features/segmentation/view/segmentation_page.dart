@@ -208,32 +208,37 @@ class _SegmentationPageState extends State<SegmentationPage> {
                         transformationController: _transformationController,
                         minScale: 0.5,
                         maxScale: 4.0,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.memory(
-                              state.displayImageData!,
-                              key: _imageKey,
-                              fit: BoxFit.contain,
-                              gaplessPlayback: true,
-                            ),
-                            if (state.maskImageData != null)
+                        // Wrap the Stack in a RotatedBox
+                        child: RotatedBox(
+                          // Dynamically calculate quarter turns (e.g., 90 / 90 = 1, 270 / 90 = 3)
+                          quarterTurns: (state.rotation ?? 90) ~/ 90,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
                               Image.memory(
-                                state.maskImageData!,
+                                state.displayImageData!,
+                                key: _imageKey,
                                 fit: BoxFit.contain,
                                 gaplessPlayback: true,
                               ),
-                            if (state.originalImage != null)
-                              CustomPaint(
-                                painter: PointPainter(
-                                  state.points,
-                                  Size(
-                                    state.originalImage!.width.toDouble(),
-                                    state.originalImage!.height.toDouble(),
+                              if (state.maskImageData != null)
+                                Image.memory(
+                                  state.maskImageData!,
+                                  fit: BoxFit.contain,
+                                  gaplessPlayback: true,
+                                ),
+                              if (state.originalImage != null)
+                                CustomPaint(
+                                  painter: PointPainter(
+                                    state.points,
+                                    Size(
+                                      state.originalImage!.width.toDouble(),
+                                      state.originalImage!.height.toDouble(),
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

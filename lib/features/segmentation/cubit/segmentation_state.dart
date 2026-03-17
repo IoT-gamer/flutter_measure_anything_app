@@ -31,6 +31,7 @@ class SegmentationState extends Equatable {
     this.fy,
     this.cx,
     this.cy,
+    this.rotation,
     this.measurement,
     this.errorMessage,
   });
@@ -54,6 +55,7 @@ class SegmentationState extends Equatable {
   final double? fy; // Focal Length Y
   final double? cx; // Principal Point X
   final double? cy; // Principal Point Y
+  final int? rotation; // Image rotation in degrees (0, 90, 180, 270)
   final MeasurementResult? measurement;
   final String? errorMessage;
 
@@ -77,6 +79,7 @@ class SegmentationState extends Equatable {
     double? fy,
     double? cx,
     double? cy,
+    int? rotation,
     MeasurementResult? measurement,
     String? errorMessage,
     bool clearMask = false,
@@ -101,6 +104,7 @@ class SegmentationState extends Equatable {
       fy: fy ?? this.fy,
       cx: cx ?? this.cx,
       cy: cy ?? this.cy,
+      rotation: rotation ?? this.rotation,
       measurement: measurement ?? this.measurement,
       errorMessage: errorMessage ?? this.errorMessage,
     );
@@ -127,6 +131,7 @@ class SegmentationState extends Equatable {
     fy,
     cx,
     cy,
+    rotation,
     measurement,
     errorMessage,
   ];

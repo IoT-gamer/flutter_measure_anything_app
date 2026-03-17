@@ -7,9 +7,12 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraCharacteristics
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.util.Log
+import android.view.Surface
 import android.view.View
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
@@ -104,7 +107,30 @@ class DepthView(
                 val fy = intrinsics.focalLength[1] * scaleH
                 val cx = intrinsics.principalPoint[0] * scaleW
                 val cy = intrinsics.principalPoint[1] * scaleH
-                
+
+                // --- Calculate exact camera sensor rotation offset ---
+                var imageRotation = 90 // Default fallback
+                try {
+                    val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+                    val cameraId = currentSession.cameraConfig.cameraId
+                    val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+                    val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+                    
+                    @Suppress("DEPRECATION")
+                    val displayRotation = activity.windowManager.defaultDisplay.rotation
+                    val surfaceRotation = when (displayRotation) {
+                        Surface.ROTATION_0 -> 0
+                        Surface.ROTATION_90 -> 90
+                        Surface.ROTATION_180 -> 180
+                        Surface.ROTATION_270 -> 270
+                        else -> 0
+                    }
+                    // Calculate the offset required to display the image upright
+                    imageRotation = (sensorOrientation - surfaceRotation + 360) % 360
+                } catch (e: Exception) {
+                    Log.e("DepthView", "Could not determine sensor orientation", e)
+                }                
+
                 // Save the SCALED values into metadata
                 val metadata = "fx:$fx,fy:$fy,cx:$cx,cy:$cy"
 

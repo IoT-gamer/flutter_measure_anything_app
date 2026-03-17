@@ -192,10 +192,14 @@ class SegmentationCubit extends Cubit<SegmentationState> {
     final cx = values['cx'];
     final cy = values['cy'];
 
-    // Emit the new state with parsed values
-    emit(state.copyWith(fx: fx, fy: fy, cx: cx, cy: cy));
+    // Extract rotation (Defaulting to 90 if missing)
+    final rotation = values['rot']?.toInt() ?? 90;
 
-    print('Parsed Intrinsics -> fx: $fx, fy: $fy, cx: $cx, cy: $cy');
+    // Emit the new state with parsed values
+    emit(state.copyWith(fx: fx, fy: fy, cx: cx, cy: cy, rotation: rotation));
+    print(
+      'Parsed Intrinsics -> fx: $fx, fy: $fy, cx: $cx, cy: $cy, rot: $rotation',
+    );
   }
 
   void addPoint(Offset originalPoint) {
