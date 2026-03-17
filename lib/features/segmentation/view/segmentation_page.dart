@@ -126,6 +126,52 @@ class _SegmentationPageState extends State<SegmentationPage> {
         },
         child: Column(
           children: <Widget>[
+            // Toggle Controls directly under the AppBar
+            BlocBuilder<SegmentationCubit, SegmentationState>(
+              buildWhen: (p, c) =>
+                  p.imageFile != c.imageFile ||
+                  p.points.length != c.points.length ||
+                  p.status != c.status,
+              builder: (context, state) {
+                if (state.imageFile == null ||
+                    state.status == SegmentationStatus.processing) {
+                  return const SizedBox.shrink();
+                }
+                if (state.points.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Tap on an object to segment it!'),
+                  );
+                }
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Fill Holes'),
+                      value: state.fillHoles,
+                      onChanged: (v) => cubit.toggleFillHoles(v),
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Remove Islands'),
+                      value: state.removeIslands,
+                      onChanged: (v) => cubit.toggleRemoveIslands(v),
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Select Largest Area'),
+                      value: state.selectLargestArea,
+                      onChanged: (value) =>
+                          cubit.toggleSelectLargestArea(value),
+                      dense: true,
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            // The Image Viewer (Expanded takes up the remaining middle space)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -136,7 +182,24 @@ class _SegmentationPageState extends State<SegmentationPage> {
                     }
                     if (state.displayImageData == null) {
                       return const Center(
-                        child: Text('Capture an depth image to get started!'),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.view_in_ar,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Capture an AR scene to start',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }
                     return GestureDetector(
@@ -179,53 +242,7 @@ class _SegmentationPageState extends State<SegmentationPage> {
               ),
             ),
 
-            // Toggle Controls
-            BlocBuilder<SegmentationCubit, SegmentationState>(
-              buildWhen: (p, c) =>
-                  p.imageFile != c.imageFile ||
-                  p.points.length != c.points.length ||
-                  p.status != c.status,
-              builder: (context, state) {
-                if (state.imageFile == null ||
-                    state.status == SegmentationStatus.processing) {
-                  return const SizedBox.shrink();
-                }
-                if (state.points.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Tap on an object to segment it!'),
-                  );
-                }
-                return Column(
-                  children: [
-                    // Compact controls to save space
-                    SwitchListTile(
-                      title: const Text('Fill Holes'),
-                      value: state.fillHoles,
-                      onChanged: (v) => cubit.toggleFillHoles(v),
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    SwitchListTile(
-                      title: const Text('Remove Islands'),
-                      value: state.removeIslands,
-                      onChanged: (v) => cubit.toggleRemoveIslands(v),
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    SwitchListTile(
-                      title: const Text('Select Largest Area'),
-                      value: state.selectLargestArea,
-                      onChanged: (value) =>
-                          cubit.toggleSelectLargestArea(value),
-                      dense: true,
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            // Bottom Buttons
+            // Bottom Buttons (AR Capture, Measure, Save)
             Container(
               padding: const EdgeInsets.all(16.0),
               width: double.infinity,
@@ -235,9 +252,9 @@ class _SegmentationPageState extends State<SegmentationPage> {
                   final modelsLoaded =
                       state.status != SegmentationStatus.initial &&
                       state.status != SegmentationStatus.loadingModels;
+
                   final isSaving = state.status == SegmentationStatus.saving;
 
-                  // Check if we have everything needed for measurement
                   final canMeasure =
                       state.maskImageData != null &&
                       state.depthMap != null &&
@@ -245,23 +262,20 @@ class _SegmentationPageState extends State<SegmentationPage> {
 
                   return Wrap(
                     alignment: WrapAlignment.spaceEvenly,
-                    spacing: 12.0, // Gap between adjacent chips
-                    runSpacing: 12.0, // Gap between lines
+                    spacing: 12.0,
+                    runSpacing: 12.0,
                     children: [
                       ElevatedButton.icon(
                         onPressed: modelsLoaded
                             ? () async {
-                                // 1. Navigate to the AR Capture Screen
-                                final File?
-                                capturedFile = await Navigator.push<File>(
-                                  context,
-                                  MaterialPageRoute(
-                                    // Make sure the class name matches your ported AR screen
-                                    builder: (context) => const ARScreen(),
-                                  ),
-                                );
+                                final File? capturedFile =
+                                    await Navigator.push<File>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const ARScreen(),
+                                      ),
+                                    );
 
-                                // 2. If a file was returned (user didn't just hit back), process it!
                                 if (capturedFile != null) {
                                   cubit.loadCapturedTiff(capturedFile);
                                 }
@@ -270,8 +284,6 @@ class _SegmentationPageState extends State<SegmentationPage> {
                         icon: const Icon(Icons.camera),
                         label: const Text('Capture AR Depth'),
                       ),
-
-                      // Measurement Button
                       ElevatedButton.icon(
                         onPressed: canMeasure
                             ? cubit.calculateRealWorldDimensions
@@ -283,8 +295,6 @@ class _SegmentationPageState extends State<SegmentationPage> {
                           foregroundColor: Colors.white,
                         ),
                       ),
-
-                      // Save Button
                       ElevatedButton.icon(
                         onPressed: (state.maskImageData != null && !isSaving)
                             ? cubit.saveImage
