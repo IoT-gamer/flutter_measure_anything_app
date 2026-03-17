@@ -213,6 +213,13 @@ class _SegmentationPageState extends State<SegmentationPage> {
                       dense: true,
                       visualDensity: VisualDensity.compact,
                     ),
+                    SwitchListTile(
+                      title: const Text('Select Largest Area'),
+                      value: state.selectLargestArea,
+                      onChanged: (value) =>
+                          cubit.toggleSelectLargestArea(value),
+                      dense: true,
+                    ),
                   ],
                 );
               },
