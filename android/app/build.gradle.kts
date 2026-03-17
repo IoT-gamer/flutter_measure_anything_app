@@ -42,3 +42,21 @@ android {
 flutter {
     source = "../.."
 }
+
+repositories {
+    maven { url = uri("https://jitpack.io") }
+}
+
+dependencies {
+    // TiffBitmapFactory for saving depth maps as TIFF files
+    implementation("com.github.deckerst:Android-TiffBitmapFactory:424b18a")
+    // ARCore
+    implementation("com.google.ar:core:1.53.0")
+    // Obj - a simple Wavefront OBJ file loader
+    // https://github.com/javagl/Obj
+    implementation("de.javagl:obj:0.4.0")
+
+    // AndroidX and Material Design
+    implementation("androidx.appcompat:appcompat:1.1.0")
+    implementation("com.google.android.material:material:1.1.0")
+}

@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../capture/view/ar_screen.dart';
 import '../cubit/segmentation_cubit.dart';
 import 'widgets/point_painter.dart';
 
@@ -68,7 +71,7 @@ class _SegmentationPageState extends State<SegmentationPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Segment Anything'),
+        title: const Text('Measure Anything'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       floatingActionButton: BlocBuilder<SegmentationCubit, SegmentationState>(
@@ -133,7 +136,7 @@ class _SegmentationPageState extends State<SegmentationPage> {
                     }
                     if (state.displayImageData == null) {
                       return const Center(
-                        child: Text('Pick a TIFF file to start'),
+                        child: Text('Capture an depth image to get started!'),
                       );
                     }
                     return GestureDetector(
@@ -239,9 +242,26 @@ class _SegmentationPageState extends State<SegmentationPage> {
                     runSpacing: 12.0, // Gap between lines
                     children: [
                       ElevatedButton.icon(
-                        onPressed: modelsLoaded ? cubit.pickTiffFile : null,
-                        icon: const Icon(Icons.folder_open),
-                        label: const Text('Load TIFF'),
+                        onPressed: modelsLoaded
+                            ? () async {
+                                // 1. Navigate to the AR Capture Screen
+                                final File?
+                                capturedFile = await Navigator.push<File>(
+                                  context,
+                                  MaterialPageRoute(
+                                    // Make sure the class name matches your ported AR screen
+                                    builder: (context) => const ARScreen(),
+                                  ),
+                                );
+
+                                // 2. If a file was returned (user didn't just hit back), process it!
+                                if (capturedFile != null) {
+                                  cubit.loadCapturedTiff(capturedFile);
+                                }
+                              }
+                            : null,
+                        icon: const Icon(Icons.camera),
+                        label: const Text('Capture AR Depth'),
                       ),
 
                       // Measurement Button

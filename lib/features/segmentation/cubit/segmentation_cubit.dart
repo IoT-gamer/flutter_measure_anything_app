@@ -2,13 +2,11 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:gal/gal.dart';
 import 'package:image/image.dart' as img;
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/segmentation_models.dart';
 import '../services/image_processing.dart';
@@ -43,46 +41,6 @@ class SegmentationCubit extends Cubit<SegmentationState> {
         state.copyWith(
           status: SegmentationStatus.failure,
           errorMessage: 'Failed to load models: $e',
-        ),
-      );
-    }
-  }
-
-  // segmentation_cubit.dart
-
-  Future<void> pickTiffFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
-
-      if (result != null && result.files.single.path != null) {
-        final String path = result.files.single.path!;
-
-        // Manual Extension Filter
-        final String extension = path.split('.').last.toLowerCase();
-        if (extension != 'tiff' && extension != 'tif') {
-          emit(
-            state.copyWith(
-              errorMessage: "Please select a valid .tiff or .tif file.",
-            ),
-          );
-          return;
-        }
-
-        final file = File(path);
-        // Reading bytes might be slow, so we emit a loading state
-        emit(state.copyWith(status: SegmentationStatus.processing));
-
-        final bytes = await file.readAsBytes();
-        await loadTiffData(bytes, file);
-      }
-    } catch (e) {
-      debugPrint("Error picking file: $e");
-      emit(
-        state.copyWith(
-          status: SegmentationStatus.failure,
-          errorMessage: "Failed to pick file: $e",
         ),
       );
     }
@@ -175,6 +133,25 @@ class SegmentationCubit extends Cubit<SegmentationState> {
     );
   }
 
+  Future<void> loadCapturedTiff(File file) async {
+    // Emit a loading state so the UI shows a spinner while reading
+    emit(state.copyWith(status: SegmentationStatus.processing));
+
+    try {
+      final bytes = await file.readAsBytes();
+      // Reuse your existing, robust TIFF parsing logic
+      await loadTiffData(bytes, file);
+    } catch (e) {
+      debugPrint("Error loading captured file: $e");
+      emit(
+        state.copyWith(
+          status: SegmentationStatus.failure,
+          errorMessage: "Failed to load captured file: $e",
+        ),
+      );
+    }
+  }
+
   // Helper to unpack 16-bit depth from Red/Green channels
   Uint16List _reconstructDepthMap(img.Image depthFrame) {
     final width = depthFrame.width;
@@ -219,29 +196,6 @@ class SegmentationCubit extends Cubit<SegmentationState> {
     emit(state.copyWith(fx: fx, fy: fy, cx: cx, cy: cy));
 
     print('Parsed Intrinsics -> fx: $fx, fy: $fy, cx: $cx, cy: $cy');
-  }
-
-  Future<void> pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      final imageFile = File(pickedFile.path);
-      final imageBytes = await imageFile.readAsBytes();
-      final originalImage = img.decodeImage(imageBytes);
-
-      emit(
-        state.copyWith(
-          status: SegmentationStatus.success,
-          imageFile: imageFile,
-          originalImage: originalImage,
-          displayImageData: imageBytes,
-          maskImageData: null,
-          points: [],
-          clearMask: true, // Explicitly clear the mask
-        ),
-      );
-    }
   }
 
   void addPoint(Offset originalPoint) {

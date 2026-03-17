@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
     return BlocProvider(
       create: (context) => SegmentationCubit(),
       child: MaterialApp(
-        title: 'Segment Anything',
+        title: 'Measure Anything',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
           useMaterial3: true,
