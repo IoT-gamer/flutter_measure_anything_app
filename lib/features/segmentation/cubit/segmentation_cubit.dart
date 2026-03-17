@@ -537,6 +537,7 @@ class SegmentationCubit extends Cubit<SegmentationState> {
     return MeasurementService.calculateDimensions(
       maskImage: params.maskImage,
       depthMap: params.depthMap,
+      confidenceMap: params.confidenceMap,
       depthWidth: params.depthWidth,
       depthHeight: params.depthHeight,
       fx: params.fx,

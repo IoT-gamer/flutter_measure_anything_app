@@ -25,6 +25,7 @@ class MeasurementService {
   static Future<MeasurementResult> calculateDimensions({
     required img.Image maskImage,
     required Uint16List depthMap,
+    Uint8List? confidenceMap,
     required int depthWidth,
     required int depthHeight,
     required double fx,
@@ -76,6 +77,14 @@ class MeasurementService {
 
           final int depthIndex = dy * depthWidth + dx;
           if (depthIndex >= depthMap.length) continue;
+
+          // Confidence Map Filtering
+          if (confidenceMap != null) {
+            // Read the 8-bit confidence score (0-255)
+            final int confidence = confidenceMap[depthIndex];
+            // Filter out points with low confidence (threshold of 190)
+            if (confidence < 190) continue;
+          }
 
           final int depthMm = depthMap[depthIndex];
 
