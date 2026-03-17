@@ -356,12 +356,14 @@ class SegmentationCubit extends Cubit<SegmentationState> {
         }
       }
 
-      final finalImage = img.Image(
+      // Create the mutable image canvas
+      img.Image finalImage = img.Image(
         width: state.originalImage!.width,
         height: state.originalImage!.height,
         numChannels: 4,
       );
 
+      // Composite the original RGB and the Mask together
       for (int y = 0; y < finalImage.height; y++) {
         for (int x = 0; x < finalImage.width; x++) {
           final originalPixel = state.originalImage!.getPixel(x, y);
@@ -381,6 +383,13 @@ class SegmentationCubit extends Cubit<SegmentationState> {
         finalImage.addTextData({'className': state.className});
       }
 
+      // --- Rotate the final composited image before saving ---
+      // We check if rotation exists and is not 0 to avoid unnecessary processing
+      if (state.rotation != null && state.rotation != 0) {
+        finalImage = img.copyRotate(finalImage, angle: state.rotation!);
+      }
+
+      // Encode and Save
       final pngBytes = img.encodePng(finalImage);
       final tempDir = await getTemporaryDirectory();
       final tempPath =
@@ -388,7 +397,6 @@ class SegmentationCubit extends Cubit<SegmentationState> {
       final tempFile = await File(tempPath).writeAsBytes(pngBytes);
       await Gal.putImage(tempFile.path);
 
-      // Use a success message in the state if you want to show a snackbar
       emit(state.copyWith(status: SegmentationStatus.success));
     } catch (e) {
       emit(
