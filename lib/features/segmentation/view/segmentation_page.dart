@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../capture/view/ar_screen.dart';
 import '../cubit/segmentation_cubit.dart';
+import 'widgets/axes_painter.dart';
 import 'widgets/point_painter.dart';
 
 class SegmentationPage extends StatefulWidget {
@@ -231,6 +232,17 @@ class _SegmentationPageState extends State<SegmentationPage> {
                                 CustomPaint(
                                   painter: PointPainter(
                                     state.points,
+                                    Size(
+                                      state.originalImage!.width.toDouble(),
+                                      state.originalImage!.height.toDouble(),
+                                    ),
+                                  ),
+                                ),
+                              if (state.originalImage != null &&
+                                  state.measurement != null)
+                                CustomPaint(
+                                  painter: AxesPainter(
+                                    state.measurement!,
                                     Size(
                                       state.originalImage!.width.toDouble(),
                                       state.originalImage!.height.toDouble(),

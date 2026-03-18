@@ -8,6 +8,7 @@ A Flutter application that leverages the **Segment Anything Model (EdgeTAM)** an
 - **Interactive Segmentation:** Add positive (green) and negative (red) reference points to guide the EdgeTAM (Segment Anything 2) segmentation model.
 - **Rich TIFF Parsing:** Automatically extracts depth data, confidence maps, and EXIF metadata (Tag 270) containing the camera's focal length and principal points (`fx`, `fy`, `cx`, `cy`).
 - **Real-World Measurements:** Computes the physical area (cm²), major axis (cm), and minor axis (cm) of segmented objects using Principal Component Analysis (PCA).
+- **Visual Measurement Overlay:** Dynamically renders the calculated Major (orange) and Minor (cyan) PCA axes directly onto the 2D image, providing immediate visual verification of the object's orientation and scale alongside the physical measurements.
 - **Hardware-Backed Noise Filtering:** Automatically leverages ARCore's 8-bit confidence map to discard "flying pixels" and unstable depth readings from reflective or textureless surfaces, ensuring highly reliable 3D point cloud generation.
 - **Advanced Mask Processing:** Refines segmentation masks using OpenCV morphology operations to fill holes, remove isolated pixels (islands), or isolate the largest contour.
 - **High Performance:** Heavy image processing, contour detection, and depth projection are offloaded to background Isolates to ensure the UI remains smooth.
@@ -66,6 +67,7 @@ The decoder outputs low-resolution masks and Intersection over Union (IoU) predi
 - Projecting the 2D pixel coordinates and depth (Z) values into a 3D point cloud using the camera's intrinsics.
 - Calculating the area of each valid pixel patch and summing them for total Area (cm²).
 - Applying Principal Component Analysis (PCA) to the 3D point cloud to determine the bounding box's Major and Minor axes, using the 2nd and 98th percentiles to filter out noise.
+- Running a secondary 2D PCA on the mask's pixel coordinates to compute the rotation and centroid, allowing the app to accurately paint the orientation axes over the UI.
 
 ## 📝 Capture Best Practices & Notes
 

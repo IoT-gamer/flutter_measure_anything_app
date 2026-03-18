@@ -1,16 +1,25 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
 class MeasurementResult {
   final double areaCm2;
   final double majorAxisCm;
   final double minorAxisCm;
+  final Offset centerPixel;
+  final double angleRadian;
+  final double majorLengthPx;
+  final double minorLengthPx;
 
   MeasurementResult({
     required this.areaCm2,
     required this.majorAxisCm,
     required this.minorAxisCm,
+    required this.centerPixel,
+    required this.angleRadian,
+    required this.majorLengthPx,
+    required this.minorLengthPx,
   });
 
   @override
@@ -54,7 +63,8 @@ class MeasurementService {
       yOffset = ((maskH * scaleUniform) - depthHeight) / 2.0;
     }
 
-    List<List<double>> pointCloud = [];
+    List<List<double>> pointCloud = []; // Physical 3D points
+    List<List<double>> pixelCloud = []; // Visual 2D points
     double totalAreaCm2 = 0.0;
 
     for (int y = 0; y < maskH; y++) {
@@ -63,6 +73,8 @@ class MeasurementService {
         final pixel = maskImage.getPixel(x, y);
 
         if (pixel.g > 0 && pixel.a > 0) {
+          // Save pixel coordinates for 2D PCA
+          pixelCloud.add([x.toDouble(), y.toDouble()]);
           // Map RGB pixel to Depth domain using the UNIFORM scale and offset
           final double xInDepthDomain = (x * scaleUniform) - xOffset;
           final double yInDepthDomain = (y * scaleUniform) - yOffset;
@@ -109,25 +121,38 @@ class MeasurementService {
     }
 
     if (pointCloud.isEmpty) {
-      return MeasurementResult(areaCm2: 0, majorAxisCm: 0, minorAxisCm: 0);
+      return MeasurementResult(
+        areaCm2: 0,
+        majorAxisCm: 0,
+        minorAxisCm: 0,
+        centerPixel: Offset.zero,
+        angleRadian: 0,
+        majorLengthPx: 0,
+        minorLengthPx: 0,
+      );
     }
 
-    // 4. Calculate Axes using PCA
-    final axes = _calculatePCA(pointCloud);
+    // Calculate Physical Axes (cm)
+    final physicalAxes = _calculatePCA(pointCloud);
+    // Calculate Visual Axes (pixels)
+    final visualAxes = _calculatePCA(pixelCloud);
 
     return MeasurementResult(
       areaCm2: totalAreaCm2,
-      majorAxisCm: axes.major,
-      minorAxisCm: axes.minor,
+      majorAxisCm: physicalAxes.major,
+      minorAxisCm: physicalAxes.minor,
+      centerPixel: Offset(visualAxes.cx, visualAxes.cy),
+      angleRadian: visualAxes.theta,
+      majorLengthPx: visualAxes.major,
+      minorLengthPx: visualAxes.minor,
     );
   }
 
   /// Calculates the Oriented Bounding Box (OBB) using PCA angle
-  static ({double major, double minor}) _calculatePCA(
-    List<List<double>> points,
-  ) {
+  static ({double major, double minor, double cx, double cy, double theta})
+  _calculatePCA(List<List<double>> points) {
     int n = points.length;
-    if (n < 2) return (major: 0.0, minor: 0.0);
+    if (n < 2) return (major: 0.0, minor: 0.0, cx: 0.0, cy: 0.0, theta: 0.0);
 
     // Calculate Centroid
     double sumX = 0, sumY = 0;
@@ -150,7 +175,7 @@ class MeasurementService {
 
     // Calculate Rotation Angle (Theta) of the Major Axis
     // Formula: 0.5 * atan2(2*xy, xx - yy)
-    final double theta = 0.5 * atan2(2 * xy, xx - yy);
+    double theta = 0.5 * atan2(2 * xy, xx - yy);
     final double cosT = cos(theta);
     final double sinT = sin(theta);
 
@@ -193,8 +218,16 @@ class MeasurementService {
       final temp = majorAxis;
       majorAxis = minorAxis;
       minorAxis = temp;
+      // IMPORTANT: Rotate angle by 90 degrees if axes were swapped
+      theta += (pi / 2);
     }
 
-    return (major: majorAxis, minor: minorAxis);
+    return (
+      major: majorAxis,
+      minor: minorAxis,
+      cx: meanX,
+      cy: meanY,
+      theta: theta,
+    );
   }
 }

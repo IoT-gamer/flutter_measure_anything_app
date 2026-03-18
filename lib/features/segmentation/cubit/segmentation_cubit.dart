@@ -516,6 +516,7 @@ class SegmentationCubit extends Cubit<SegmentationState> {
       emit(
         state.copyWith(
           status: SegmentationStatus.success,
+          measurement: result,
           errorMessage: "Measurement Results:\n$result",
         ),
       );
