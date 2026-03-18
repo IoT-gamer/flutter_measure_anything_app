@@ -379,8 +379,25 @@ class SegmentationCubit extends Cubit<SegmentationState> {
         }
       }
 
+      // Initialize an empty map for the metadata
+      Map<String, String> metadata = {};
+
       if (state.className.isNotEmpty) {
-        finalImage.addTextData({'className': state.className});
+        metadata['className'] = state.className;
+      }
+
+      // --- Inject measurement data if it exists ---
+      if (state.measurement != null) {
+        metadata['area_cm2'] = state.measurement!.areaCm2.toStringAsFixed(2);
+        metadata['major_axis_cm'] = state.measurement!.majorAxisCm
+            .toStringAsFixed(2);
+        metadata['minor_axis_cm'] = state.measurement!.minorAxisCm
+            .toStringAsFixed(2);
+      }
+
+      // Apply all metadata to the image if the map is not empty
+      if (metadata.isNotEmpty) {
+        finalImage.addTextData(metadata);
       }
 
       // --- Rotate the final composited image before saving ---

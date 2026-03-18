@@ -12,7 +12,7 @@ A Flutter application that leverages the **Segment Anything Model (EdgeTAM)** an
 - **Hardware-Backed Noise Filtering:** Automatically leverages ARCore's 8-bit confidence map to discard "flying pixels" and unstable depth readings from reflective or textureless surfaces, ensuring highly reliable 3D point cloud generation.
 - **Advanced Mask Processing:** Refines segmentation masks using OpenCV morphology operations to fill holes, remove isolated pixels (islands), or isolate the largest contour.
 - **High Performance:** Heavy image processing, contour detection, and depth projection are offloaded to background Isolates to ensure the UI remains smooth.
-- **Export & Save:** Composites the final segmentation mask over the original RGB image and saves it directly to your device's gallery.
+- **Export & Save:** Composites the final segmentation mask over the original RGB image and saves it directly to your device's gallery. Measurements are stored as **PNG text chunks** in the image's metadata.
 
 ## 📋 Prerequisites
 
