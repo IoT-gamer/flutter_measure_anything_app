@@ -22,6 +22,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.examples.java.common.helpers.DisplayRotationHelper
 import com.google.ar.core.examples.java.common.rendering.BackgroundRenderer
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
@@ -40,13 +41,15 @@ class DepthView(
     messenger: BinaryMessenger,
     id: Int,
     private val lifecycle: Lifecycle
-) : PlatformView, DefaultLifecycleObserver, MethodChannel.MethodCallHandler, GLSurfaceView.Renderer {
+) : PlatformView, DefaultLifecycleObserver, MethodChannel.MethodCallHandler, EventChannel.StreamHandler, GLSurfaceView.Renderer {
 
     private val glSurfaceView: GLSurfaceView
     private val displayRotationHelper: DisplayRotationHelper
     private val backgroundRenderer = BackgroundRenderer()
     private var session: Session? = null
     private val mainScope = CoroutineScope(Dispatchers.Main)
+    private val depthCoverageAnalyzer = DepthCoverageAnalyzer()
+    private var eventSink: EventChannel.EventSink? = null
 
     init {
         glSurfaceView = GLSurfaceView(context).apply {
@@ -55,9 +58,25 @@ class DepthView(
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         }
         displayRotationHelper = DisplayRotationHelper(context)
+
+        // Setup MethodChannel
         val methodChannel = MethodChannel(messenger, "com.example.flutter_measure_anything_app/depth_ar_channel")
         methodChannel.setMethodCallHandler(this)
+
+        // Setup EventChannel for the coverage stream
+        val eventChannel = EventChannel(messenger, "com.example.flutter_measure_anything_app/depth_coverage_channel")
+        eventChannel.setStreamHandler(this)
+
         lifecycle.addObserver(this)
+    }
+
+    // Implement EventChannel.StreamHandler methods
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        eventSink = events
+    }
+
+    override fun onCancel(arguments: Any?) {
+        eventSink = null
     }
 
     override fun getView(): View = glSurfaceView
@@ -298,7 +317,19 @@ class DepthView(
         session?.let {
             displayRotationHelper.updateSessionIfNeeded(it)
             it.setCameraTextureName(backgroundRenderer.textureId)
-            backgroundRenderer.draw(it.update())
+            // Extract the frame into a variable so we can pass it to the analyzer
+            val frame = it.update()
+
+            // Draw the AR background
+            backgroundRenderer.draw(frame)
+
+            // Feed the frame to the analyzer
+            if (eventSink != null) {
+                depthCoverageAnalyzer.analyzeFrame(frame) { percentage ->
+                    // This callback runs on the Main thread, safe to sink to Flutter
+                    eventSink?.success(percentage)
+                }
+            }
         }
     }
 
@@ -308,6 +339,9 @@ class DepthView(
     }
 
     override fun dispose() {
+        depthCoverageAnalyzer.close()
+        eventSink = null
+        
         session?.close()
         session = null
     }

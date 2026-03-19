@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,13 +17,30 @@ class _ARScreenState extends State<ARScreen> {
     'com.example.flutter_measure_anything_app/depth_ar_channel',
   );
 
+  static const EventChannel _coverageChannel = EventChannel(
+    'com.example.flutter_measure_anything_app/depth_coverage_channel',
+  );
+
   bool _hasPermission = false;
   bool _isProcessing = false;
+
+  double _depthCoverage = 0.0;
+  StreamSubscription? _coverageSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkCameraPermission();
+  }
+
+  void _startCoverageStream() {
+    _coverageSubscription = _coverageChannel.receiveBroadcastStream().listen((
+      event,
+    ) {
+      setState(() {
+        _depthCoverage = event as double; // This will be 0.0 to 1.0
+      });
+    }, onError: (error) => debugPrint("Coverage Stream Error: $error"));
   }
 
   Future<void> _checkCameraPermission() async {
@@ -85,29 +103,99 @@ class _ARScreenState extends State<ARScreen> {
   }
 
   @override
+  void dispose() {
+    _coverageSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!_hasPermission) {
       return const Scaffold(
         body: Center(child: Text("Camera permission is required for AR.")),
       );
     }
+
+    // --- Determine UI states based on live coverage ---
+    // Require at least 20% coverage to allow a capture
+    final bool canCapture = _depthCoverage >= 0.20;
+
+    Color indicatorColor;
+    String indicatorText;
+
+    // debugPrint("Depth Coverage: $_depthCoverage");
+
+    if (_depthCoverage < 0.20) {
+      indicatorColor = Colors.redAccent;
+      indicatorText = "Poor Depth - Move closer or pan slowly";
+    } else if (_depthCoverage < 0.50) {
+      indicatorColor = Colors.orangeAccent;
+      indicatorText = "Fair Depth - Keep scanning object";
+    } else {
+      indicatorColor = Colors.greenAccent;
+      indicatorText = "Good Depth - Ready to capture";
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('AR Depth Utility')),
       body: Stack(
         children: [
-          // 1. The Native AR View
-          const AndroidView(
+          // The Native AR View
+          AndroidView(
             viewType: 'depth_ar_view',
-            creationParamsCodec: StandardMessageCodec(),
+            creationParamsCodec: const StandardMessageCodec(),
+            //  Wait for the native view to be built before listening
+            onPlatformViewCreated: (int id) {
+              _startCoverageStream();
+            },
           ),
 
-          // 2. UI Overlay for Capture
+          // Depth Quality HUD Overlay
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.black54, // Semi-transparent background
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    indicatorText,
+                    style: TextStyle(
+                      color: indicatorColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Animated progress bar mapped to the 0.0 - 1.0 coverage float
+                  LinearProgressIndicator(
+                    value: _depthCoverage,
+                    backgroundColor: Colors.grey[800],
+                    valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // UI Overlay for Capture
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 50.0),
               child: FloatingActionButton.extended(
-                onPressed: _isProcessing ? null : _captureAndReturn,
+                // Disable button if processing OR if depth coverage is too low
+                onPressed: (_isProcessing || !canCapture)
+                    ? null
+                    : _captureAndReturn,
+                backgroundColor: canCapture ? null : Colors.grey.shade400,
                 label: _isProcessing
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('Capture 16-bit TIFF'),
