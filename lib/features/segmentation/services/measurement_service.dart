@@ -84,8 +84,9 @@ class MeasurementService {
           int dy = yInDepthDomain.round();
 
           // Skip pixels that fall outside the depth map's cropped field of view
-          if (dx < 0 || dx >= depthWidth || dy < 0 || dy >= depthHeight)
+          if (dx < 0 || dx >= depthWidth || dy < 0 || dy >= depthHeight) {
             continue;
+          }
 
           final int depthIndex = dy * depthWidth + dx;
           if (depthIndex >= depthMap.length) continue;
@@ -137,8 +138,11 @@ class MeasurementService {
     // Calculate Visual Axes (pixels)
     final visualAxes = _calculatePCA(pixelCloud);
 
+    // Apply the 3D tilt correction to the flattened 2D area
+    double correctedAreaCm2 = totalAreaCm2 * physicalAxes.tiltRatio;
+
     return MeasurementResult(
-      areaCm2: totalAreaCm2,
+      areaCm2: correctedAreaCm2,
       majorAxisCm: physicalAxes.major,
       minorAxisCm: physicalAxes.minor,
       centerPixel: Offset(visualAxes.cx, visualAxes.cy),
@@ -149,10 +153,26 @@ class MeasurementService {
   }
 
   /// Calculates the Oriented Bounding Box (OBB) using PCA angle
-  static ({double major, double minor, double cx, double cy, double theta})
+  static ({
+    double major,
+    double minor,
+    double cx,
+    double cy,
+    double theta,
+    double tiltRatio,
+  })
   _calculatePCA(List<List<double>> points) {
     int n = points.length;
-    if (n < 2) return (major: 0.0, minor: 0.0, cx: 0.0, cy: 0.0, theta: 0.0);
+    if (n < 2) {
+      return (
+        major: 0.0,
+        minor: 0.0,
+        cx: 0.0,
+        cy: 0.0,
+        theta: 0.0,
+        tiltRatio: 1.0,
+      );
+    }
 
     // Calculate Centroid
     double sumX = 0, sumY = 0;
@@ -173,52 +193,59 @@ class MeasurementService {
       xy += dx * dy;
     }
 
-    // Calculate Rotation Angle (Theta) of the Major Axis
-    // Formula: 0.5 * atan2(2*xy, xx - yy)
+    // Calculate Rotation Angle (Theta)
     double theta = 0.5 * atan2(2 * xy, xx - yy);
     final double cosT = cos(theta);
     final double sinT = sin(theta);
 
-    // Project all points onto the new rotated axes (Major and Minor)
-    // We want to find the physical extent (Max - Min) along these axes.
-    List<double> projectedMajor = [];
-    List<double> projectedMinor = [];
+    List<({double proj, List<double> point})> projMajor = [];
+    List<({double proj, List<double> point})> projMinor = [];
 
     for (var p in points) {
-      // Center the point first
       double dx = p[0] - meanX;
       double dy = p[1] - meanY;
-
-      // Rotate:
-      // Major = x*cos + y*sin
-      // Minor = -x*sin + y*cos
-      projectedMajor.add(dx * cosT + dy * sinT);
-      projectedMinor.add(-dx * sinT + dy * cosT);
+      projMajor.add((proj: dx * cosT + dy * sinT, point: p));
+      projMinor.add((proj: -dx * sinT + dy * cosT, point: p));
     }
 
-    // Calculate Range using Percentiles (Robust to outliers)
-    // Using strict Min/Max can be ruined by one noisy pixel.
-    // Using 2% and 98% is safer for depth maps.
-    projectedMajor.sort();
-    projectedMinor.sort();
+    projMajor.sort((a, b) => a.proj.compareTo(b.proj));
+    projMinor.sort((a, b) => a.proj.compareTo(b.proj));
 
-    // Helper to get percentile value
-    double getRange(List<double> sortedData) {
-      if (sortedData.isEmpty) return 0.0;
-      int minIdx = (n * 0.02).floor().clamp(0, n - 1); // 2nd percentile
-      int maxIdx = (n * 0.98).floor().clamp(0, n - 1); // 98th percentile
-      return sortedData[maxIdx] - sortedData[minIdx];
+    int minIdx = (n * 0.02).floor().clamp(0, n - 1);
+    int maxIdx = (n * 0.98).floor().clamp(0, n - 1);
+
+    // --- Measure strictly along the axis line ---
+    double getAxisLength(List<({double proj, List<double> point})> sortedProj) {
+      // Get the flat 1D distance strictly along the projected axis
+      double flatDist = sortedProj[maxIdx].proj - sortedProj[minIdx].proj;
+
+      // Get the Z (depth) difference between those exact two points
+      double dz = 0.0;
+      if (sortedProj[maxIdx].point.length > 2 &&
+          sortedProj[minIdx].point.length > 2) {
+        dz = sortedProj[maxIdx].point[2] - sortedProj[minIdx].point[2];
+      }
+
+      // Calculate true length using the Pythagorean theorem (automatically handles 2D vs 3D)
+      return sqrt(flatDist * flatDist + dz * dz);
     }
 
-    double majorAxis = getRange(projectedMajor);
-    double minorAxis = getRange(projectedMinor);
+    double majorAxis = getAxisLength(projMajor);
+    double minorAxis = getAxisLength(projMinor);
+
+    // Calculate Area Tilt Correction
+    double flatMajor = projMajor[maxIdx].proj - projMajor[minIdx].proj;
+    double flatMinor = projMinor[maxIdx].proj - projMinor[minIdx].proj;
+
+    double tiltRatio = (flatMajor * flatMinor > 0.01)
+        ? (majorAxis * minorAxis) / (flatMajor * flatMinor)
+        : 1.0;
 
     // Ensure Major is the larger one
     if (minorAxis > majorAxis) {
       final temp = majorAxis;
       majorAxis = minorAxis;
       minorAxis = temp;
-      // IMPORTANT: Rotate angle by 90 degrees if axes were swapped
       theta += (pi / 2);
     }
 
@@ -228,6 +255,7 @@ class MeasurementService {
       cx: meanX,
       cy: meanY,
       theta: theta,
+      tiltRatio: tiltRatio,
     );
   }
 }
