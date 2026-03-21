@@ -2,6 +2,11 @@
 
 A Flutter application that leverages the **Segment Anything Model (EdgeTAM)** and **ARCore** raw depth data to interactively segment objects and calculate their precise real-world dimensions. With integrated ARCore capabilities, this app natively captures and processes multi-layer `.tiff` files containing RGB imagery, 16-bit depth maps, confidence maps, and camera intrinsics all in one seamless workflow.
 
+## 📷 Screenshots
+
+<img src="docs/images/demo1.jpg" alt="drawing" height="300"/>
+<img src="docs/images/demo2.jpg" alt="drawing" height="300"/>
+
 ## 🌟 Features
 
 - **Integrated AR Capture:** Built-in native Android ARCore integration captures high-fidelity 16-bit raw depth maps and 8-bit confidence maps directly within the app, removing the need for external tools.
