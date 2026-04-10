@@ -27,7 +27,23 @@ To run this application, you will need the following:
     An ARCore-supported Android device. For the most accurate real-world measurements, a device equipped with a hardware Time-of-Flight (ToF) depth sensor is highly recommended.
 
 2. **ONNX Models:**
-    The app uses the EdgeTAM architecture for segmentation. You need to export the PyTorch models to ONNX format using the [edgetam_onnx_export.ipynb](https://github.com/IoT-gamer/segment-anything-dinov3-onnx/blob/main/notebooks/edgetam_onnx_export.ipynb) notebook found in the [Segment Anything DINOv3 ONNX](https://github.com/IoT-gamer/segment-anything-dinov3-onnx) repository.
+    The app uses the EdgeTAM architecture for segmentation. You need to export the PyTorch models to ONNX format. Follow these steps to obtain the ONNX models:
+
+    * Download EdgeTAM encoder and decoder from [Qualcomm's AI Hub](https://aihub.qualcomm.com/models/edgetam)
+    * Select **ONNX Runtime** as the target framework and choose the appropriate device for mobile deployment.
+    * unzip the downloaded files
+    * merge the `model.data` and `model.onnx` files for both encoder and decoder to create `edgetam_encoder.onnx` and `edgetam_decoder.onnx`.
+        #### python example for merging ONNX files with external data:
+        ```python
+        import onnx
+        # Load the model (ensure `model.data` is in the same folder)
+        model_enc = onnx.load("encoder/model.onnx")
+        # Save it back to a single file
+        # This will embed the external data into the .onnx file itself
+        onnx.save(model_enc, "edgetam_encoder.onnx")
+
+        model_dec = onnx.load("decoder/model.onnx")
+        onnx.save(model_dec, "edgetam_decoder.onnx")
 
 ## 🚀 Installation & Setup
 
