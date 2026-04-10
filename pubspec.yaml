@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   equatable: ^2.0.8
   flutter_bloc: ^9.1.1
-  flutter_onnxruntime: ^1.6.3
+  flutter_onnxruntime: ^1.6.4
   gal: ^2.3.2
   image: ^4.8.0
   opencv_dart: ^2.2.1
