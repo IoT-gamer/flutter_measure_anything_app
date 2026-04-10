@@ -10,6 +10,7 @@ A Flutter application that leverages the **Segment Anything Model (EdgeTAM)** an
 ## 🌟 Features
 
 - **Integrated AR Capture:** Built-in native Android ARCore integration captures high-fidelity 16-bit raw depth maps and 8-bit confidence maps directly within the app, removing the need for external tools.
+- **Bounding Box Selection:** Toggle "Box Mode" and drag your finger to draw a precise bounding box around an object for instant segmentation.
 - **Interactive Segmentation:** Add positive (green) and negative (red) reference points to guide the EdgeTAM (Segment Anything 2) segmentation model.
 - **Rich TIFF Parsing:** Automatically extracts depth data, confidence maps, and EXIF metadata (Tag 270) containing the camera's focal length and principal points (`fx`, `fy`, `cx`, `cy`).
 - **Real-World Measurements:** Computes the physical area (cm²), major axis (cm), and minor axis (cm) of segmented objects using Principal Component Analysis (PCA).
@@ -78,7 +79,8 @@ The user taps "Capture AR Depth", opening a native Android ARCore view. The app 
 
 **2. Image Preprocessing & Encoding** Once the capture is returned to the segmentation screen, the app decodes the first frame (RGB) and scales it to 1024x1024. The image tensor is normalized and passed to `edgetam_encoder.onnx` to generate the image embeddings.
 
-**3. Point Prompting & Decoding** When you tap the screen, the widget coordinates are mapped back to the model's 1024x1024 coordinate space. These point coordinates and their associated labels (1 for positive, 0 for negative) are passed to `edgetam_decoder.onnx` alongside the image embeddings.
+**3. Point/Box Prompting & Decoding** 
+When you tap the screen, the widget coordinates are mapped back to the model's 1024x1024 coordinate space. These point coordinates and their associated labels (1 for positive, 0 for negative) are passed to `edgetam_decoder.onnx` alongside the image embeddings.
 
 **4. Mask Generation & Refinement**
 The decoder outputs low-resolution masks and Intersection over Union (IoU) predictions. The app selects the mask with the highest IoU. If enabled, an Isolate applies OpenCV operations (`cv.morphologyEx` and `cv.findContours`) to clean up the mask (filling holes, removing islands, keeping the largest area) before resizing it back to the original image dimensions.

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../capture/view/ar_screen.dart';
@@ -20,22 +21,20 @@ class _SegmentationPageState extends State<SegmentationPage> {
   final TransformationController _transformationController =
       TransformationController();
 
-  void _handleTapUp(TapUpDetails details, SegmentationState state) {
-    final cubit = context.read<SegmentationCubit>();
-    if (state.imageFile == null ||
-        state.status == SegmentationStatus.processing ||
-        state.originalImage == null) {
-      return;
-    }
+  Offset? _dragStart;
+  Rect? _currentDragBox;
 
+  Offset? _getOriginalCoordinates(
+    Offset globalPosition,
+    SegmentationState state,
+  ) {
     final keyContext = _imageKey.currentContext;
-    if (keyContext == null) return;
+    if (keyContext == null || state.originalImage == null) return null;
 
     final RenderBox renderBox = keyContext.findRenderObject() as RenderBox;
     final Size widgetSize = renderBox.size;
-    final Offset localPosition = renderBox.globalToLocal(
-      details.globalPosition,
-    );
+    final Offset localPosition = renderBox.globalToLocal(globalPosition);
+
     final fittedSizes = applyBoxFit(
       BoxFit.contain,
       Size(
@@ -44,6 +43,7 @@ class _SegmentationPageState extends State<SegmentationPage> {
       ),
       widgetSize,
     );
+
     final Size destSize = fittedSizes.destination;
     final double dx = (widgetSize.width - destSize.width) / 2;
     final double dy = (widgetSize.height - destSize.height) / 2;
@@ -54,7 +54,7 @@ class _SegmentationPageState extends State<SegmentationPage> {
       destSize.height,
     );
 
-    if (!destRect.contains(localPosition)) return;
+    if (!destRect.contains(localPosition)) return null;
 
     final double originalX =
         (localPosition.dx - destRect.left) *
@@ -63,7 +63,22 @@ class _SegmentationPageState extends State<SegmentationPage> {
         (localPosition.dy - destRect.top) *
         (state.originalImage!.height / destRect.height);
 
-    cubit.addPoint(Offset(originalX, originalY));
+    return Offset(originalX, originalY);
+  }
+
+  void _handleTapUp(TapUpDetails details, SegmentationState state) {
+    if (state.imageFile == null ||
+        state.status == SegmentationStatus.processing ||
+        state.originalImage == null) {
+      return;
+    }
+    final originalPoint = _getOriginalCoordinates(
+      details.globalPosition,
+      state,
+    );
+    if (originalPoint != null) {
+      context.read<SegmentationCubit>().addPoint(originalPoint);
+    }
   }
 
   @override
@@ -85,6 +100,17 @@ class _SegmentationPageState extends State<SegmentationPage> {
           return Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              FloatingActionButton.small(
+                onPressed: cubit.toggleBoxMode,
+                backgroundColor: state.isBoxMode
+                    ? Colors.orange
+                    : Colors.grey[300],
+                tooltip: 'Toggle Box Mode',
+                child: Icon(
+                  state.isBoxMode ? Icons.crop_free : Icons.touch_app,
+                  color: Colors.white,
+                ),
+              ),
               FloatingActionButton.small(
                 onPressed: () => cubit.setPointLabel(1),
                 backgroundColor: state.currentPointLabel == 1
@@ -132,16 +158,20 @@ class _SegmentationPageState extends State<SegmentationPage> {
               buildWhen: (p, c) =>
                   p.imageFile != c.imageFile ||
                   p.points.length != c.points.length ||
+                  p.boundingBox != c.boundingBox ||
                   p.status != c.status,
               builder: (context, state) {
                 if (state.imageFile == null ||
                     state.status == SegmentationStatus.processing) {
                   return const SizedBox.shrink();
                 }
-                if (state.points.isEmpty) {
+                if (state.points.isEmpty && state.boundingBox == null) {
                   return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Tap on an object to segment it!'),
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Text(
+                      'Tap or draw a box to segment an object!',
+                      style: TextStyle(fontSize: 18),
+                    ),
                   );
                 }
                 return Column(
@@ -204,11 +234,66 @@ class _SegmentationPageState extends State<SegmentationPage> {
                       );
                     }
                     return GestureDetector(
-                      onTapUp: (details) => _handleTapUp(details, state),
+                      // Handle Taps (Point Mode)
+                      onTapUp: state.isBoxMode
+                          ? null
+                          : (details) => _handleTapUp(details, state),
+
+                      // Handle Drags (Box Mode with Haptic Delay)
+                      onLongPressStart: !state.isBoxMode
+                          ? null
+                          : (details) {
+                              // Trigger the haptic vibration!
+                              HapticFeedback.heavyImpact();
+
+                              _dragStart = _getOriginalCoordinates(
+                                details.globalPosition,
+                                state,
+                              );
+                              setState(() {
+                                _currentDragBox = null;
+                              });
+                            },
+                      onLongPressMoveUpdate: !state.isBoxMode
+                          ? null
+                          : (details) {
+                              if (_dragStart == null) return;
+
+                              final currentOriginal = _getOriginalCoordinates(
+                                details.globalPosition,
+                                state,
+                              );
+
+                              if (currentOriginal != null) {
+                                setState(() {
+                                  _currentDragBox = Rect.fromPoints(
+                                    _dragStart!,
+                                    currentOriginal,
+                                  );
+                                });
+                              }
+                            },
+                      onLongPressEnd: !state.isBoxMode
+                          ? null
+                          : (details) {
+                              if (_currentDragBox != null) {
+                                cubit.updateBoundingBox(_currentDragBox);
+                                cubit.submitBoundingBox();
+                              }
+
+                              setState(() {
+                                _dragStart = null;
+                                _currentDragBox = null;
+                              });
+                            },
+
                       child: InteractiveViewer(
                         transformationController: _transformationController,
                         minScale: 0.5,
                         maxScale: 4.0,
+                        // Disable panning/zooming while drawing the box
+                        panEnabled: !state.isBoxMode,
+                        scaleEnabled: !state.isBoxMode,
                         // Wrap the Stack in a RotatedBox
                         child: RotatedBox(
                           // Dynamically calculate quarter turns (e.g., 90 / 90 = 1, 270 / 90 = 3)
@@ -236,6 +321,9 @@ class _SegmentationPageState extends State<SegmentationPage> {
                                       state.originalImage!.width.toDouble(),
                                       state.originalImage!.height.toDouble(),
                                     ),
+                                    // Pass the local drawing box, or the saved state box
+                                    boundingBox:
+                                        _currentDragBox ?? state.boundingBox,
                                   ),
                                 ),
                               if (state.originalImage != null &&
